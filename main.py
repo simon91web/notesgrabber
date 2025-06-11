@@ -21,13 +21,15 @@ class FileProcessor:
             return 'utf-8'
 
     def read_file(self, file_path):
-        encoding = self.detect_encoding(file_path)
-        try:
-            with open(file_path, 'r', encoding=encoding) as file:
-                return file.read()
-        except Exception as e:
-            self.errors.append((file_path, str(e)))
-            return None
+        encodings = [(self.detect_encoding(file_path), 'strict'), ('utf-8', 'replace'), ('latin-1', 'strict')]
+        for encoding, error_handling in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding, errors=error_handling) as file:
+                    return file.read()
+            except Exception as e:
+                self.errors.append((file_path, f"Kodierungsfehler mit {encoding}: {str(e)}"))
+        self.errors.append((file_path, "Alle Kodierungsversuche fehlgeschlagen"))
+        return None
 
     def write_file(self, content, output_path):
         with open(output_path, 'w', encoding='utf-8') as file:
