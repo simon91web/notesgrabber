@@ -45,6 +45,9 @@ class MarkdownConsolidator:
         directory = Path(directory)
 
         for file_path in directory.rglob('*'):
+            # Überspringe versteckte Ordner (beginnend mit '.')
+            if any(part.startswith('.') for part in file_path.parts):
+                continue
             rel_path = file_path.relative_to(directory)
             if file_path.is_file():
                 if file_path.suffix.lower() == '.md':
