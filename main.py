@@ -5,6 +5,7 @@ from pathlib import Path
 import time
 import chardet
 import os
+import subprocess
 
 # Model
 class FileProcessor:
@@ -43,10 +44,11 @@ class MarkdownConsolidator:
     def consolidate(self, directory):
         output_content = []
         non_md_files = []
+        md_file_count = 0
         directory = Path(directory)
+        dir_name = directory.name
 
         for file_path in directory.rglob('*'):
-            # Überspringe versteckte Ordner (beginnend mit '.')
             if any(part.startswith('.') for part in file_path.parts):
                 continue
             rel_path = file_path.relative_to(directory)
@@ -55,6 +57,7 @@ class MarkdownConsolidator:
                     content = self.processor.read_file(file_path)
                     if content is not None:
                         output_content.append(f"## Datei: {rel_path}\n\n{content}\n\n")
+                        md_file_count += 1
                 else:
                     non_md_files.append(str(rel_path))
 
@@ -64,15 +67,21 @@ class MarkdownConsolidator:
             if self.processor.errors:
                 output_content.append("# Fehler\n\n" + "\n".join(f"- {path}: {error}" for path, error in self.processor.errors) + "\n")
             timestamp = int(time.time())
-            output_path = Path.home() / "Downloads" / f"Zusammenfassung_{timestamp}.md"
+            output_path = Path.home() / "Downloads" / f"{dir_name}_{timestamp}.md"
             self.processor.write_file("".join(output_content), output_path)
-            return output_path
-        return None
+            return output_path, md_file_count
+        return None, 0
 
 # View
 class ConsoleView:
     def show_error(self, message):
         print(f"Fehler: {message}")
+
+    def show_success(self, file_count, error_count):
+        if error_count > 0:
+            print(f"{file_count} Dateien wurden mit {error_count} Fehlern zusammengefasst")
+        else:
+            print(f"{file_count} Dateien wurden erfolgreich zusammengefasst")
 
 class FileDialogView:
     def __init__(self):
@@ -100,9 +109,17 @@ class AppController:
         if not directory:
             self.view.show_error("Kein Verzeichnis ausgewählt!")
             return
-        output_path = self.model.consolidate(directory)
+        output_path, file_count = self.model.consolidate(directory)
         if not output_path:
             self.view.show_error("Keine Markdown-Dateien gefunden!")
+        else:
+            console_view = ConsoleView()
+            console_view.show_success(file_count, len(self.model.processor.errors))
+            downloads_path = Path.home() / "Downloads"
+            if os.name == 'nt':  # Windows
+                os.startfile(downloads_path)
+            else:  # macOS/Linux
+                subprocess.run(['open', downloads_path] if os.name == 'posix' else ['xdg-open', downloads_path])
         self.view.destroy()
 
 # Hauptprogramm
